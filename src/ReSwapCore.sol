@@ -19,25 +19,30 @@ contract ReSwapCore {
     uint256 constant SLOT_TOKEN_1 = 1;
     uint256 constant SLOT_RESERVES = 2;
 
-    function initializeTokens(address _token0, address _token1) internal {
-        (address _t0, address _t1) = getSortPair(_token0, _token1);
-        token0 = _t0;
-        token1 = _t1;
-    }
-
     function getBalances() public view returns (uint256 _balance0, uint256 _balance1) {
         _balance0 = getBalance0();
         _balance1 = getBalance1();
     }
 
-    function getSortedBalances(address tokenA) internal view returns (uint256 _balance0, uint256 _balance1) {
-        if (isToken0(tokenA)) {
-            _balance0 = getBalance0();
-            _balance1 = getBalance1();
-        } else {
-            _balance0 = getBalance1();
-            _balance1 = getBalance0();
+    function getReserves() public view returns (uint112 _reserve0, uint112 _reserve1) {
+        assembly {
+            let data := sload(SLOT_RESERVES) // Загрузка данных из слота 6
+            _reserve0 := and(data, 0xfffffffffffffffffffffffffff) // Маска для первых 112 бит
+            _reserve1 := and(shr(112, data), 0xfffffffffffffffffffffffffff) // Сдвиг на 112 бит вправо и маска
         }
+    }
+
+    function getLastTimestamp() public view returns (uint32 _lastTimestamp) {
+        assembly {
+            let data := sload(SLOT_RESERVES) // Загрузка данных из слота 6
+            _lastTimestamp := and(shr(224, data), 0xffffffff) // Сдвиг на 224 бита вправо и маска для последних 32 бит
+        }
+    }
+
+    function initializeTokens(address _token0, address _token1) internal {
+        (address _t0, address _t1) = getSortPair(_token0, _token1);
+        token0 = _t0;
+        token1 = _t1;
     }
 
     function updateReserves(uint112 _reserve0, uint112 _reserve1, uint32 _lastTimestamp) internal {
@@ -48,11 +53,13 @@ contract ReSwapCore {
         }
     }
 
-    function getReserves() public view returns (uint112 _reserve0, uint112 _reserve1) {
-        assembly {
-            let data := sload(SLOT_RESERVES) // Загрузка данных из слота 6
-            _reserve0 := and(data, 0xfffffffffffffffffffffffffff) // Маска для первых 112 бит
-            _reserve1 := and(shr(112, data), 0xfffffffffffffffffffffffffff) // Сдвиг на 112 бит вправо и маска
+    function getSortedBalances(address tokenA) internal view returns (uint256 _balance0, uint256 _balance1) {
+        if (isToken0(tokenA)) {
+            _balance0 = getBalance0();
+            _balance1 = getBalance1();
+        } else {
+            _balance0 = getBalance1();
+            _balance1 = getBalance0();
         }
     }
 
@@ -73,6 +80,54 @@ contract ReSwapCore {
             _token0 := sload(SLOT_TOKEN_0)
             _token1 := sload(SLOT_TOKEN_1)
         }
+    }
+
+    function getBalanceByToken(address token) internal view returns (uint256 _balance) {
+        if (isToken0(token)) {
+            _balance = getBalance0();
+        } else {
+            _balance = getBalance1();
+        }
+    }
+
+    function validateDeadline(uint256 deadline) internal view {
+        assembly {
+            if lt(deadline, timestamp()) {
+                let selector := 0xf87d9271 // ExpiredDeadline()
+                mstore(0x00, selector)
+                revert(0x00, 0x04)
+            }
+        }
+    }
+
+    function getMaxFlashLoan(address tokenFL) internal view returns (uint256 loan) {
+        validateToken(tokenFL);
+        uint256 percent = getPercentFL(tokenFL);
+        address _token0;
+        assembly {
+            _token0 := sload(SLOT_TOKEN_0)
+        }
+
+        if (tokenFL == token0) {
+            // Если токеном для flash loan является token0
+            loan = (reserve0 * percent) / 1000; // Делим на 1000, так как процент в тысячных долях
+        } else {
+            // Если токеном для flash loan является token1
+            loan = (reserve1 * percent) / 1000; // Делим на 1000 для корректного расчета
+        }
+    }
+
+    function getBalance0() internal view returns (uint256 _balance0) {
+        _balance0 = getTokenBalance(SLOT_TOKEN_0);
+    }
+
+    function getBalance1() internal view returns (uint256 _balance0) {
+        _balance0 = getTokenBalance(SLOT_TOKEN_1);
+    }
+
+    function getFlashFee(address token, uint256 amount) internal view returns (uint256 fee) {
+        validateToken(token);
+        fee = (amount * 1003) / 1000;
     }
 
     function getAmountOut(uint256 amountIn, uint112 reserveIn, uint112 reserveOut)
@@ -133,37 +188,6 @@ contract ReSwapCore {
         }
     }
 
-    function getLastTimestamp() public view returns (uint32 _lastTimestamp) {
-        assembly {
-            let data := sload(SLOT_RESERVES) // Загрузка данных из слота 6
-            _lastTimestamp := and(shr(224, data), 0xffffffff) // Сдвиг на 224 бита вправо и маска для последних 32 бит
-        }
-    }
-
-    function getBalanceByToken(address token) internal view returns (uint256 _balance) {
-        if (isToken0(token)) {
-            _balance = getBalance0();
-        } else {
-            _balance = getBalance1();
-        }
-    }
-
-    function isToken0(address token) private view returns (bool) {
-        address _token0;
-        assembly {
-            _token0 := sload(SLOT_TOKEN_0)
-        }
-        return token == _token0;
-    }
-
-    function getBalance0() public view returns (uint256 _balance0) {
-        _balance0 = getTokenBalance(SLOT_TOKEN_0);
-    }
-
-    function getBalance1() public view returns (uint256 _balance0) {
-        _balance0 = getTokenBalance(SLOT_TOKEN_1);
-    }
-
     function validateSwap(uint256 amountOut0, uint256 amountOut1, uint112 reserveA, uint112 reserveB) internal pure {
         assembly {
             if iszero(or(gt(amountOut0, 0), gt(amountOut1, 0))) {
@@ -195,52 +219,6 @@ contract ReSwapCore {
         }
     }
 
-    function validateDeadline(uint256 deadline) internal view {
-        assembly {
-            if lt(deadline, timestamp()) {
-                let selector := 0xf87d9271 // ExpiredDeadline()
-                mstore(0x00, selector)
-                revert(0x00, 0x04)
-            }
-        }
-    }
-
-    function getMaxFlashLoan(address tokenFL) internal view returns (uint256 loan) {
-        validateToken(tokenFL);
-        //(uint112 r0, uint112 r1) = getReserves();
-        uint256 percent = getPercentFL(tokenFL);
-        address _token0;
-        assembly {
-            _token0 := sload(SLOT_TOKEN_0)
-        }
-
-        if (tokenFL == token0) {
-            // Если токеном для flash loan является token0
-            loan = (reserve0 * percent) / 1000; // Делим на 1000, так как процент в тысячных долях
-        } else {
-            // Если токеном для flash loan является token1
-            loan = (reserve1 * percent) / 1000; // Делим на 1000 для корректного расчета
-        }
-    }
-
-    function getFlashFee(address token, uint256 amount) internal view returns (uint256 fee) {
-        validateToken(token);
-        fee = (amount * 1003) / 1000;
-    }
-
-    function validateToken(address token) private view {
-        assembly {
-            let _token0 := sload(SLOT_TOKEN_0)
-            let _token1 := sload(SLOT_TOKEN_1)
-
-            if iszero(or(eq(token, _token0), eq(token, _token1))) {
-                let selector := 0xc1ab6dc1 // InvalidToken()
-                mstore(0x00, selector)
-                revert(0x00, 0x04)
-            }
-        }
-    }
-
     function quote(uint256 amount0, uint256 r0, uint256 r1) internal pure returns (uint256 amount1) {
         checkReserves(amount0, r0, r1);
         assembly {
@@ -264,6 +242,27 @@ contract ReSwapCore {
             default {
                 t0 := _t1
                 t1 := _t0
+            }
+        }
+    }
+
+    function isToken0(address token) private view returns (bool) {
+        address _token0;
+        assembly {
+            _token0 := sload(SLOT_TOKEN_0)
+        }
+        return token == _token0;
+    }
+
+    function validateToken(address token) private view {
+        assembly {
+            let _token0 := sload(SLOT_TOKEN_0)
+            let _token1 := sload(SLOT_TOKEN_1)
+
+            if iszero(or(eq(token, _token0), eq(token, _token1))) {
+                let selector := 0xc1ab6dc1 // InvalidToken()
+                mstore(0x00, selector)
+                revert(0x00, 0x04)
             }
         }
     }
