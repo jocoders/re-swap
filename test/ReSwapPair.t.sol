@@ -6,7 +6,7 @@ import {ReSwapPair} from "../src/ReSwapPair.sol";
 import {MockERC20} from "./MockERC20.t.sol";
 import {ReSwapPairTestHelper} from "./ReSwapPairTestHelper.t.sol";
 import {ReSwapFactoryTestHelper} from "./ReSwapFactoryTestHelper.t.sol";
-import {YulTransfer} from "../libraries/YulTransfer.sol";
+import {TransferHelper} from "../libraries/TransferHelper.sol";
 
 contract ReSwapPairTest is Test {
     //ReSwapPairTestHelper private reSwapPair;
@@ -143,8 +143,8 @@ contract ReSwapPairTest is Test {
     //     prepareTransfer();
 
     //     vm.prank(address(pair));
-    //     YulTransfer.safeTransfer(address(token0), Alice, 500_000);
-    //     YulTransfer.safeTransfer(address(token0), Bob, 100_500);
+    //     TransferHelper.safeTransfer(address(token0), Alice, 500_000);
+    //     TransferHelper.safeTransfer(address(token0), Bob, 100_500);
 
     //     uint256 aliceBalance1 = token0.balanceOf(Alice);
     //     uint256 bobBalance1 = token0.balanceOf(Bob);
