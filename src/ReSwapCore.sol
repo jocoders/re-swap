@@ -19,6 +19,27 @@ contract ReSwapCore {
     uint256 constant SLOT_TOKEN_1 = 1;
     uint256 constant SLOT_RESERVES = 2;
 
+    error CoreContractFirstInInheritance(uint256 slotToken0, uint256 slotToken1);
+
+    constructor() {
+        assembly {
+            let slotToken0 := token0.slot
+            let slotToken1 := token1.slot
+
+            if and(iszero(eq(slotToken0, SLOT_TOKEN_0)), iszero(eq(slotToken1, SLOT_TOKEN_1))) {
+                let selector := 0x0bb796dd // CoreContractFirstInInheritance(uint256,uint256)
+                let ptr := mload(0x40)
+
+                mstore(ptr, selector) // Сохранение селектора ошибки
+                mstore(add(ptr, 0x04), slotToken0) // Сохранение первого параметра
+                mstore(add(ptr, 0x24), slotToken1) // Сохранение второго параметра
+
+                // Вызов revert с начальным адресом и размером данных
+                revert(ptr, 0x44) // 0x44 = 68 bytes (4 bytes selector + 32 bytes slotToken0 + 32 bytes slotToken1)
+            }
+        }
+    }
+
     function getBalances() public view returns (uint256 _balance0, uint256 _balance1) {
         _balance0 = getBalance0();
         _balance1 = getBalance1();
@@ -26,9 +47,9 @@ contract ReSwapCore {
 
     function getReserves() public view returns (uint112 _reserve0, uint112 _reserve1) {
         assembly {
-            let data := sload(SLOT_RESERVES) // Загрузка данных из слота 6
-            _reserve0 := and(data, 0xfffffffffffffffffffffffffff) // Маска для первых 112 бит
-            _reserve1 := and(shr(112, data), 0xfffffffffffffffffffffffffff) // Сдвиг на 112 бит вправо и маска
+            let data := sload(SLOT_RESERVES) // Загрузка данных из слота 2
+            _reserve0 := and(data, 0xfffffffffffffffffffff) // Маска для первых 112 бит
+            _reserve1 := and(shr(112, data), 0xfffffffffffffffffffff) // Сдвиг на 112 бит вправо и маска
         }
     }
 
@@ -39,16 +60,14 @@ contract ReSwapCore {
         }
     }
 
-    function initializeTokens(address _token0, address _token1) internal {
-        (address _t0, address _t1) = getSortPair(_token0, _token1);
-        token0 = _t0;
-        token1 = _t1;
+    function initialize(address _token0, address _token1) public virtual {
+        token0 = _token0;
+        token1 = _token1;
     }
 
     function updateReserves(uint112 _reserve0, uint112 _reserve1, uint32 _lastTimestamp) internal {
         assembly {
-            // Упаковываем _reserve0, _reserve1 и _lastTimestamp в один слот
-            let combined := or(or(shl(144, _reserve0), shl(32, _reserve1)), _lastTimestamp)
+            let combined := or(or(_reserve0, shl(112, _reserve1)), shl(224, _lastTimestamp))
             sstore(SLOT_RESERVES, combined)
         }
     }
@@ -223,26 +242,6 @@ contract ReSwapCore {
         checkReserves(amount0, r0, r1);
         assembly {
             amount1 := div(mul(amount0, r1), r0)
-        }
-    }
-
-    function getSortPair(address _t0, address _t1) internal pure returns (address t0, address t1) {
-        assembly {
-            if iszero(_t0) {
-                let selector := 0xd92e233d // ZeroAddress()
-                mstore(0x00, selector)
-                revert(0x00, 0x04)
-            }
-
-            switch lt(_t0, _t1)
-            case 1 {
-                t0 := _t0
-                t1 := _t1
-            }
-            default {
-                t0 := _t1
-                t1 := _t0
-            }
         }
     }
 
