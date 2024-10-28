@@ -2,6 +2,7 @@
 pragma solidity ^0.8.20;
 
 import {ReSwapPair} from "../src/ReSwapPair.sol";
+import {IReSwapFlashBorrower} from "../interfaces/IReSwapFlashBorrower.sol";
 import {Test, console2} from "forge-std/Test.sol";
 
 contract ReSwapPairTestHelper is ReSwapPair {

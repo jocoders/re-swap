@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import {console2} from "forge-std/Test.sol";
+import {Test, console2} from "forge-std/Test.sol";
 
 contract ReSwapCore {
     // Slot 0 - do not change order of variables!!!
@@ -146,7 +146,9 @@ contract ReSwapCore {
 
     function getFlashFee(address token, uint256 amount) internal view returns (uint256 fee) {
         validateToken(token);
-        fee = (amount * 1003) / 1000;
+        assembly {
+            fee := div(mul(amount, 3), 100)
+        }
     }
 
     function getAmountOut(uint256 amountIn, uint112 reserveIn, uint112 reserveOut)
@@ -268,40 +270,26 @@ contract ReSwapCore {
 
     function getPercentFL(address tokenFL) private view returns (uint256 percent) {
         (uint112 r0, uint112 r1) = getReserves();
-
         assembly {
             let _token0 := sload(SLOT_TOKEN_0)
 
             // Максимальный процент - 15% (в долях от 1000, то есть 150 = 15%)
-            let maxPercent := 150
+            let maxPercent := 100
             let minPercent := 50
 
-            // Рассчитываем соотношение резервов
+            let isTokenFL0 := eq(tokenFL, _token0)
             let ratio
-            if eq(tokenFL, _token0) {
-                // Соотношение token1 к token0
-                ratio := div(mul(r1, 1000), r0)
-            }
-            if iszero(eq(tokenFL, _token0)) {
-                // Соотношение token0 к token1
-                ratio := div(mul(r0, 1000), r1)
-            }
 
-            // Умная корреляция процента на основе соотношения резервов
-            if gt(ratio, 1000) {
-                // Если актив перекуплен (соотношение больше 1000), уменьшаем процент
-                percent := sub(maxPercent, div(sub(ratio, 1000), 10))
+            switch isTokenFL0
+            case 0 { ratio := div(mul(r1, 1000), r0) }
+            default { ratio := div(mul(r0, 1000), r1) }
 
-                // Убедимся, что процент не опускается ниже минимального значения
-                if lt(percent, minPercent) { percent := minPercent }
-            }
-            if iszero(gt(ratio, 1000)) {
-                // Если актив менее ликвиден (соотношение меньше 1000), увеличиваем процент
-                percent := add(maxPercent, div(sub(1000, ratio), 10))
+            let basePercent := 100
+            let isTokenOverSold := iszero(gt(ratio, 1000))
 
-                // Убедимся, что процент не превышает максимального значения
-                if gt(percent, maxPercent) { percent := maxPercent }
-            }
+            switch isTokenOverSold
+            case 0 { percent := maxPercent }
+            default { percent := minPercent }
         }
     }
 
