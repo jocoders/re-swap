@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.20;
+pragma solidity 0.8.20;
 
 library EventHelper {
   function emitMint(uint256 amount0, uint256 amount1) internal {
