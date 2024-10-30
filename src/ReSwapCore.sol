@@ -22,7 +22,7 @@ contract ReSwapCore {
     uint256 constant SLOT_RESERVES = 2;
 
     /// @dev Error for incorrect inheritance order in derived contracts
-    error CoreContractFirstInInheritance(uint256 slotToken0, uint256 slotToken1);
+    error FirstInInheritance(uint256 slotToken0, uint256 slotToken1);
 
     /// @notice Initializes the contract ensuring correct slot positions for token addresses
     constructor() {
@@ -31,7 +31,7 @@ contract ReSwapCore {
             let slotToken1 := token1.slot
 
             if and(iszero(eq(slotToken0, SLOT_TOKEN_0)), iszero(eq(slotToken1, SLOT_TOKEN_1))) {
-                let selector := 0x0bb796dd // CoreContractFirstInInheritance(uint256,uint256)
+                let selector := 0xd1a150a1 // FirstInInheritance(uint256,uint256)
                 let ptr := mload(0x40)
 
                 mstore(ptr, selector)
