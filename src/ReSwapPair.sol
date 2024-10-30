@@ -70,7 +70,7 @@ contract ReSwapPair is ReSwapCore, ERC20, ReentrancyGuard, IReSwapFlashLender {
         (amount0, amount1) = computeLiquidity(desiredAmount0, desiredAmount1, minAmount0, minAmount1);
         TransferHelper.safeTransferFrom(token0, msg.sender, address(this), amount0);
         TransferHelper.safeTransferFrom(token1, msg.sender, address(this), amount1);
-        liquidity = mint(to);
+        liquidity = _mintTokens(to);
     }
 
     /// @notice Removes liquidity from the pool and returns underlying tokens to the remover
@@ -296,7 +296,7 @@ contract ReSwapPair is ReSwapCore, ERC20, ReentrancyGuard, IReSwapFlashLender {
         (uint256 _balance0, uint256 _balance1) = getBalances();
 
         uint256 liquidity = balanceOf[address(this)];
-        bool feeOn = mintFee(_reserve0, _reserve1);
+        bool feeOn = _mintFee(_reserve0, _reserve1);
         uint256 _totalSupply = totalSupply;
 
         amount0 = (liquidity * _balance0) / _totalSupply;
@@ -356,13 +356,13 @@ contract ReSwapPair is ReSwapCore, ERC20, ReentrancyGuard, IReSwapFlashLender {
     /// @dev Calculates liquidity based on the current reserves and the amounts provided
     /// @param to The address to which the liquidity tokens will be sent
     /// @return liquidity The amount of liquidity minted
-    function mint(address to) private returns (uint256 liquidity) {
+    function _mintTokens(address to) private returns (uint256 liquidity) {
         (uint112 _reserve0, uint112 _reserve1) = getReserves();
         (uint256 _balance0, uint256 _balance1) = getBalances();
 
         uint256 amount0 = _balance0 - _reserve0;
         uint256 amount1 = _balance1 - _reserve1;
-        bool feeOn = mintFee(_reserve0, _reserve1);
+        bool feeOn = _mintFee(_reserve0, _reserve1);
         uint256 _totalSupply = totalSupply;
 
         if (_totalSupply == 0) {
@@ -387,7 +387,7 @@ contract ReSwapPair is ReSwapCore, ERC20, ReentrancyGuard, IReSwapFlashLender {
     /// @param _reserve0 The reserve of token0
     /// @param _reserve1 The reserve of token1
     /// @return feeOn Boolean indicating if the fee was applied
-    function mintFee(uint112 _reserve0, uint112 _reserve1) private returns (bool feeOn) {
+    function _mintFee(uint112 _reserve0, uint112 _reserve1) private returns (bool feeOn) {
         address feeTo = IReSwapFactory(factory).feeTo();
         feeOn = feeTo != address(0);
         uint256 liquidity;
@@ -438,7 +438,6 @@ contract ReSwapPair is ReSwapCore, ERC20, ReentrancyGuard, IReSwapFlashLender {
         returns (uint256 burnAmount0, uint256 burnAmount1)
     {
         validateDeadline(deadline);
-        TransferHelper.safeTransferFrom(address(this), msg.sender, address(this), liquidity);
         (burnAmount0, burnAmount1) = burn(to);
         require(burnAmount0 >= minAmount0, "INSUFFICIENT_0_AMOUNT");
         require(burnAmount1 >= minAmount1, "INSUFFICIENT_1_AMOUNT");
