@@ -276,14 +276,12 @@ contract ReSwapPair is ReSwapCore, ERC20, ReentrancyGuard, IReSwapFlashLender {
         uint256 amountInB = _balanceB > reserveB - amountOutB ? _balanceB - (reserveB - amountOutB) : 0;
         require(amountInA > 0 || amountInB > 0, "INSUFFICIENT_INPUT_AMOUNT");
 
-        unchecked {
-            uint256 balanceAdjustedA = _balanceA * 1000 - amountInA * 3;
-            uint256 balanceAdjustedB = _balanceB * 1000 - amountInB * 3;
-            require(
-                balanceAdjustedA * balanceAdjustedB >= uint256(reserveA) * uint256(reserveB) * (1000 ** 2),
-                "CONSTANT_INVARIANT_FAILED"
-            );
-        }
+        uint256 balanceAdjustedA = _balanceA * 1000 - amountInA * 3;
+        uint256 balanceAdjustedB = _balanceB * 1000 - amountInB * 3;
+        require(
+            balanceAdjustedA * balanceAdjustedB >= uint256(reserveA) * uint256(reserveB) * (1000 ** 2),
+            "CONSTANT_INVARIANT_FAILED"
+        );
 
         update(_balanceA, _balanceB, reserveA, reserveB);
         EventHelper.emitSwap(to, amountInA, amountInB, amountOutA, amountOutB);
@@ -371,11 +369,9 @@ contract ReSwapPair is ReSwapCore, ERC20, ReentrancyGuard, IReSwapFlashLender {
             liquidity = FixedPointMathLib.sqrt(amount0 * amount1) - MINIMUM_LIQUIDITY;
             _mint(address(0), MINIMUM_LIQUIDITY); // permanently lock the first MINIMUM_LIQUIDITY tokens
         } else {
-            unchecked {
-                uint256 liquidity0 = (amount0 * _totalSupply) / _reserve0;
-                uint256 liquidity1 = (amount1 * _totalSupply) / _reserve1;
-                liquidity = liquidity0 < liquidity1 ? liquidity0 : liquidity1;
-            }
+            uint256 liquidity0 = (amount0 * _totalSupply) / _reserve0;
+            uint256 liquidity1 = (amount1 * _totalSupply) / _reserve1;
+            liquidity = liquidity0 < liquidity1 ? liquidity0 : liquidity1;
         }
 
         require(liquidity > 0, "INSUFFICIENT_LIQUIDITY_MINTED");
@@ -402,11 +398,9 @@ contract ReSwapPair is ReSwapCore, ERC20, ReentrancyGuard, IReSwapFlashLender {
                 uint256 rootConstant = FixedPointMathLib.sqrt(uint256(_reserve0) * uint256(_reserve1));
                 uint256 lastRootConstant = FixedPointMathLib.sqrt(_lastConstant);
                 if (rootConstant > lastRootConstant) {
-                    unchecked {
-                        uint256 numerator = totalSupply * (rootConstant - lastRootConstant);
-                        uint256 denominator = rootConstant * 5 + lastRootConstant;
-                        liquidity = numerator / denominator;
-                    }
+                    uint256 numerator = totalSupply * (rootConstant - lastRootConstant);
+                    uint256 denominator = rootConstant * 5 + lastRootConstant;
+                    liquidity = numerator / denominator;
                     if (liquidity > 0) _mint(feeTo, liquidity);
                 }
             }
