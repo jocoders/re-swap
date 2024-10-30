@@ -21,7 +21,7 @@ contract ReSwapCore {
   uint256 constant SLOT_TOKEN_1 = 1;
   uint256 constant SLOT_RESERVES = 2;
 
-  //// @dev Error for incorrect inheritance order in derived contracts
+  /// @dev Error for incorrect inheritance order in derived contracts
   error FirstInInheritance(uint256 slotToken0, uint256 slotToken1);
 
   /// @notice Initializes the contract ensuring correct slot positions for token addresses
