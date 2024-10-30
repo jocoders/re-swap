@@ -1,6 +1,3 @@
-Here's a comprehensive `README.md` for your Solidity Foundry project, ReSwap, which re-implements Uniswap V2 with specific requirements and enhancements. You can copy and paste this directly into your project's README file.
-
-````markdown
 # ReSwap
 
 **Overview**
@@ -55,7 +52,6 @@ Run tests using Foundry:
 ```bash
 forge test
 ```
-````
 
 **Usage**
 
